@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const SignupPage = () => {
+
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -45,9 +48,8 @@ const SignupPage = () => {
       alert("Signup failed: " + errorText);
     } else {
       const successText = await response.text();
-      alert(successText); // "User registered successfully"
-      // Optionally redirect to login
-      // navigate("/login");
+      alert(successText);
+      navigate("/login");
     }
   } catch (error) {
     console.error("Signup error:", error);

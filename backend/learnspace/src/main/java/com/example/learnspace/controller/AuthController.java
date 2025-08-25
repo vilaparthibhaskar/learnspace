@@ -1,6 +1,6 @@
 package com.example.learnspace.controller;
 
-import com.example.learnspace.model.Person;
+import com.example.learnspace.model.entity.Person;
 import com.example.learnspace.repository.PersonRepository;
 import com.example.learnspace.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;

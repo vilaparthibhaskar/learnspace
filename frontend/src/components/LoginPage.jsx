@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Link, Navigate } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import {changeAddress, changeEmail, changePhoneNumber, changeUserName, changeRole } from "../store/slices/userSlice";
+import {changeAddress, changeEmail, changePhoneNumber, changeUserName, changeRole, updateToken } from "../store/slices/userSlice";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -29,7 +29,7 @@ const LoginPage = () => {
       return res.json();
     })
     .then(data => {
-      const {userName, email, address, PhoneNumber, role} = data;
+      const {userName, email, address, PhoneNumber, role, token} = data;
       if (data.token) {
         localStorage.setItem('jwt', data.token);
         dispatch(changeUserName(userName))
@@ -37,6 +37,7 @@ const LoginPage = () => {
         dispatch(changeEmail(email))
         dispatch(changePhoneNumber(PhoneNumber))
         dispatch(changeRole(role))
+        dispatch(updateToken(token))
         alert('Login successful!');
         navigate('/home');
       }
