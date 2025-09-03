@@ -1,52 +1,66 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Link, Navigate } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import {changeAddress, changeEmail, changePhoneNumber, changeUserName, changeRole, updateToken } from "../store/slices/userSlice";
+import { Link, useNavigate } from "react-router-dom";
+import { loginSuccess } from "../store/slices/userSlice";
 
-const LoginPage = () => {
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+
+export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
 
-  const handleSubmit = (e) => {
-  e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-  fetch('http://localhost:8080/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  })
-    .then(async (res) => {
-      console.log(res);
       if (!res.ok) {
-        const errorText = await res.text();
-        console.log("this is your " + errorText);
-        throw new Error(errorText || 'Login failed');
+        // try to extract message
+        let msg;
+        try {
+          const data = await res.json();
+          msg = data?.message || data?.error;
+        } catch {
+          msg = await res.text();
+        }
+        throw new Error("Login failed");
       }
-      return res.json();
-    })
-    .then(data => {
-      const {userName, email, address, PhoneNumber, role, token} = data;
-      if (data.token) {
-        localStorage.setItem('jwt', data.token);
-        dispatch(changeUserName(userName))
-        dispatch(changeAddress(address))
-        dispatch(changeEmail(email))
-        dispatch(changePhoneNumber(PhoneNumber))
-        dispatch(changeRole(role))
-        dispatch(updateToken(token))
-        alert('Login successful!');
-        navigate('/home');
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert('Invalid credentials. Please try again.');
-    });
-};
+
+      const data = await res.json();
+      // backend fields: token, userName, email, address, PhoneNumber, role
+      const payload = {
+        token: data.token ?? null,
+        name: data.userName ?? "",
+        email: data.email ?? "",
+        address: data.address ?? "",
+        phoneNumber: data.phoneNumber ?? data.PhoneNumber ?? "", // handle both
+        role: (data.role ?? "").toString(), // keep original
+      };
+
+      // persist to Redux + localStorage in one action
+      dispatch(loginSuccess(payload));
+
+      // optional: quick toast/alert
+      // alert("Login successful!");
+
+      navigate("/home");
+    } catch (err) {
+      setError("Invalid credentials. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="container mt-5">
@@ -67,6 +81,7 @@ const LoginPage = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="username"
                   />
                 </div>
                 <div className="mb-3">
@@ -78,21 +93,27 @@ const LoginPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                   />
                 </div>
+
+                {error && (
+                  <div className="alert alert-danger py-2" role="alert">
+                    {error}
+                  </div>
+                )}
+
                 <div className="d-grid">
-                  <button type="submit" className="btn btn-primary">
-                    Login
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? "Logging in..." : "Login"}
                   </button>
                 </div>
               </form>
             </div>
             <div className="card-footer text-center">
               <small>
-                Dont Have an Account
-                    <Link to="/signup">
-                        {" "}Register
-                    </Link>
+                Don’t have an account?
+                <Link to="/signup"> Register</Link>
               </small>
             </div>
           </div>
@@ -100,6 +121,4 @@ const LoginPage = () => {
       </div>
     </div>
   );
-};
-
-export default LoginPage;
+}

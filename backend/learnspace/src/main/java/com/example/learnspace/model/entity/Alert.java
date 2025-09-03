@@ -34,11 +34,24 @@ public class Alert {
     private boolean pinned = false;
 
     @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt;
+
+    @PrePersist
+    void prePersist() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
 
     @PreUpdate
-    void preUpdate() { this.updatedAt = Instant.now(); }
+    void preUpdate() {
+        updatedAt = Instant.now();
+    }
 }

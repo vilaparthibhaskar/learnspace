@@ -19,6 +19,8 @@ const Header = () => {
       })
       .then(() => {
         localStorage.removeItem("jwt");
+        localStorage.removeItem("role");
+        localStorage.removeItem("email");
         navigate("/login");
       })
       .catch((err) => {
