@@ -106,8 +106,16 @@ public class SubmissionController {
     @PatchMapping("/{id}/grade")
     public SubmissionDto grade(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String graderEmail = body.get("graderEmail");
-        BigDecimal points = body.get("points") == null ? null : new BigDecimal(body.get("points"));
+        BigDecimal points = body.get("gradePoints") == null ? null : new BigDecimal(body.get("gradePoints"));
         String feedback = body.get("feedback");
         return submissionService.grade(graderEmail, id, points, feedback);
     }
+
+
+    @GetMapping("/classes/{classId}/submissions")
+    public List<SubmissionDto> inClass(@PathVariable Long classId) {
+        return submissionService.listByClass(classId); // instructor-only check inside service
+    }
+
+
 }

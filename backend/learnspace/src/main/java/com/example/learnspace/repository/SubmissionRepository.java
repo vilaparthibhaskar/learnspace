@@ -37,4 +37,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
       where a.id = :assignmentId
     """)
     List<Submission> findByAssignmentId(Long assignmentId);
+
+    // NEW: all submissions in a class, newest first
+    List<Submission> findByAssignment_Clazz_IdOrderBySubmittedAtDesc(Long classId);
 }

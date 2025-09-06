@@ -22,26 +22,36 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // <-- enable CORS here
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // everything is open in dev; lock down later as needed
                         .anyRequest().permitAll()
                 );
+
         return http.build();
     }
 
-    // Central CORS config used by Spring Security (covers preflight)
+    /**
+     * CORS used by Spring Security (covers preflight). We scope it to API + files.
+     * If you later serve from a different host/port, add it to allowedOrigins.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
-        cfg.setExposedHeaders(List.of("Authorization")); // optional
-        cfg.setAllowCredentials(true);                   // REQUIRED for credentials: "include"
+        // If you want to read filename from JS on downloads, you can expose:
+        // cfg.setExposedHeaders(List.of("Authorization","Content-Disposition"));
+        cfg.setExposedHeaders(List.of("Authorization"));
+        cfg.setAllowCredentials(true);   // needed when fetch(..., { credentials: "include" })
         cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", cfg); // scope to your API
+        // Your JSON APIs (includes uploads endpoint under /api/uploads/local)
+        source.registerCorsConfiguration("/api/**", cfg);
+        // Static files served by WebMvcConfigurer.addResourceHandlers("/files/**")
+        source.registerCorsConfiguration("/files/**", cfg);
         return source;
     }
 

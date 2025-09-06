@@ -35,13 +35,18 @@ public class AssignmentService {
                 .stream().map(AssignmentDto::from).toList();
     }
 
+    /**
+     * Create assignment (optionally with attachmentUrl).
+     */
     @Transactional
     public AssignmentDto create(Long classId, String creatorEmail, String title, String description,
-                                Instant dueAt, BigDecimal maxPoints) {
+                                Instant dueAt, BigDecimal maxPoints, String attachmentUrl) {
         // must be instructor/admin in this class
         boolean canCreate = classMemberRepo.existsByPerson_EmailAndClazz_IdAndRoleInClass(
                 creatorEmail, classId, ClassRole.INSTRUCTOR);
-        if (!canCreate) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can create assignments");
+        if (!canCreate) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can create assignments");
+        }
 
         ClassRoom clazz = classRoomRepo.findById(classId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found"));
@@ -54,6 +59,7 @@ public class AssignmentService {
                 .description(description)
                 .dueAt(dueAt)
                 .maxPoints(maxPoints == null ? new BigDecimal("100.00") : maxPoints)
+                .attachmentUrl((attachmentUrl == null || attachmentUrl.isBlank()) ? null : attachmentUrl)
                 .createdBy(creator)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -62,12 +68,23 @@ public class AssignmentService {
         return AssignmentDto.from(assignmentRepo.save(a));
     }
 
+    /**
+     * Partial update.
+     * - Fields set to null/blank by caller will be applied as such (e.g., dueAt null clears due date).
+     * - For attachment: only changed when attachmentProvided = true.
+     *     - attachmentProvided && attachmentUrl is blank => clear attachment
+     *     - attachmentProvided && attachmentUrl non-blank => set/replace
+     *     - attachmentProvided == false => leave as-is
+     */
     @Transactional
     public AssignmentDto update(Long classId, Long assignmentId, String editorEmail, String title,
-                                String description, Instant dueAt, BigDecimal maxPoints) {
+                                String description, Instant dueAt, BigDecimal maxPoints,
+                                boolean attachmentProvided, String attachmentUrl) {
         boolean canEdit = classMemberRepo.existsByPerson_EmailAndClazz_IdAndRoleInClass(
                 editorEmail, classId, ClassRole.INSTRUCTOR);
-        if (!canEdit) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can update assignments");
+        if (!canEdit) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can update assignments");
+        }
 
         Assignment a = assignmentRepo.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
@@ -77,10 +94,22 @@ public class AssignmentService {
 
         if (title != null) a.setTitle(title);
         if (description != null) a.setDescription(description);
-        a.setDueAt(dueAt);
-        if (maxPoints != null) a.setMaxPoints(maxPoints);
-        a.setUpdatedAt(Instant.now());
 
+        // Keep your existing semantics: controller always sends dueAt (ISO or blank),
+        // so setting here will either update or clear.
+        a.setDueAt(dueAt);
+
+        if (maxPoints != null) a.setMaxPoints(maxPoints);
+
+        if (attachmentProvided) {
+            if (attachmentUrl == null || attachmentUrl.isBlank()) {
+                a.setAttachmentUrl(null); // clear
+            } else {
+                a.setAttachmentUrl(attachmentUrl); // set/replace
+            }
+        }
+
+        a.setUpdatedAt(Instant.now());
         return AssignmentDto.from(assignmentRepo.save(a));
     }
 
@@ -88,7 +117,9 @@ public class AssignmentService {
     public void delete(Long classId, Long assignmentId, String requesterEmail) {
         boolean canDelete = classMemberRepo.existsByPerson_EmailAndClazz_IdAndRoleInClass(
                 requesterEmail, classId, ClassRole.INSTRUCTOR);
-        if (!canDelete) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can delete assignments");
+        if (!canDelete) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only instructors can delete assignments");
+        }
 
         Assignment a = assignmentRepo.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));

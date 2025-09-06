@@ -87,7 +87,6 @@ public class SubmissionService {
 
         Long classId = s.getAssignment().getClazz().getId();
 
-        // Only instructor can grade
         boolean isInstructor = classMemberRepo.existsByPerson_EmailAndClazz_IdAndRoleInClass(
                 graderEmail, classId, ClassRole.INSTRUCTOR);
         if (!isInstructor) {
@@ -97,23 +96,40 @@ public class SubmissionService {
         Person grader = personRepo.findByEmail(graderEmail)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Grader not found"));
 
-        s.setGradePoints(points);
-        s.setFeedback(feedback);
+        // update fields
+        s.setGradePoints(points); // may be null (clear grade)
+        s.setFeedback((feedback != null && !feedback.isBlank()) ? feedback : null);
         s.setGradedBy(grader);
         s.setGradedAt(Instant.now());
+
+        // status: only mark GRADED if points provided; otherwise keep/submitted
+        System.out.println(points);
+        if (points != null) {
+            s.setStatus(SubmissionStatus.GRADED);
+        } else if (s.getStatus() == null) {
+            s.setStatus(SubmissionStatus.SUBMITTED);
+        }
         s = submissionRepo.save(s);
 
-        // Notify the student
-        String subject = "Your submission was graded";
-        String body = "Hi " + s.getStudent().getName() + ",\n\n" +
-                "Your submission for \"" + s.getAssignment().getTitle() + "\" has been graded.\n" +
-                "Points: " + points + "\n" +
-                (feedback != null ? "Feedback: " + feedback + "\n" : "") +
-                "\nThanks.";
-        emailService.send(s.getStudent().getEmail(), subject, body);
+        // notify student (only if we actually have something to say)
+        boolean hasPoints = points != null;
+        boolean hasFeedback = s.getFeedback() != null && !s.getFeedback().isBlank();
+        if (hasPoints || hasFeedback) {
+            String subject = hasPoints ? "Your submission was graded" : "Your submission was reviewed";
+            StringBuilder body = new StringBuilder()
+                    .append("Hi ").append(s.getStudent().getName()).append(",\n\n")
+                    .append("Your submission for \"").append(s.getAssignment().getTitle()).append("\" has been ")
+                    .append(hasPoints ? "graded" : "reviewed").append(".\n");
+            if (hasPoints) body.append("Points: ").append(points).append("\n");
+            if (hasFeedback) body.append("Feedback: ").append(s.getFeedback()).append("\n");
+            body.append("\nThanks.");
+
+            emailService.send(s.getStudent().getEmail(), subject, body.toString());
+        }
 
         return SubmissionDto.from(s);
     }
+
 
     private void notifyInstructorsOnNewSubmission(Long classId, String studentName, String assignmentTitle, String fileUrl) {
         // fetch instructors of the class
@@ -132,5 +148,15 @@ public class SubmissionService {
         for (ClassMember cm : members) {
             emailService.send(cm.getPerson().getEmail(), subject, body);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<SubmissionDto> listByClass(Long classId) {
+        // NOTE: Without requester info we cannot enforce "instructor-only" here.
+        // This returns all submissions for the class.
+        return submissionRepo.findByAssignment_Clazz_IdOrderBySubmittedAtDesc(classId)
+                .stream()
+                .map(SubmissionDto::from)
+                .toList();
     }
 }

@@ -1,7 +1,9 @@
+// src/main/java/com/example/learnspace/model/entity/Assignment.java
 package com.example.learnspace.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,6 +35,10 @@ public class Assignment {
     @Column(nullable = false, precision = 6, scale = 2)
     private BigDecimal maxPoints = new BigDecimal("100.00");
 
+    // NEW: optional attachment URL (e.g., http://localhost:8080/files/....pdf)
+    @Column(name = "attachment_url", length = 1024)
+    private String attachmentUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private Person createdBy; // instructor
@@ -47,5 +53,6 @@ public class Assignment {
     void preUpdate() { this.updatedAt = Instant.now(); }
 
     @OneToMany(mappedBy = "assignment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Submission> submissions = new ArrayList<>();
 }

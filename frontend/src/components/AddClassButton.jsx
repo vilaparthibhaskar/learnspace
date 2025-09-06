@@ -1,52 +1,78 @@
-// AddClassButton.jsx
-import { useState } from "react";
+import React, { useState } from "react";
+import Modal from "../components/Modal";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 
-export default function AddClassButton({ onCreated }) {           // <-- accept prop
-  const [showDialog, setShowDialog] = useState(false);
+export default function AddClassButton({ onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // ✅ match backend field names
   const [form, setForm] = useState({
-    ownerEmail: "",
+    ownerEmail: localStorage.getItem("email") || "",
     name: "",
     description: "",
     code: "",
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  function onChange(e) {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   }
 
-  async function handleSubmit(e) {
+  async function onSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      const payload = {
+        ownerEmail: form.ownerEmail.trim(),
+        name: form.name.trim(),
+        code: form.code.trim(),
+        description: form.description?.trim() || null,
+      };
+      if (!payload.ownerEmail || !payload.name || !payload.code) {
+        throw new Error("Owner Email, Name, and Code are required.");
+      }
+
       const res = await fetch(`${API_BASE}/api/classes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // cache: "no-store", // optional: avoid any caching weirdness
-        body: JSON.stringify(form),
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token")
+            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            : {}),
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const msg = (await res.text()) || res.statusText;
+        // Pull a good message from JSON or text
+        let msg = res.statusText;
+        try {
+          const j = await res.json();
+          msg =
+            j?.message ||
+            (Array.isArray(j?.errors) ? j.errors.join("; ") : "") ||
+            j?.error ||
+            j?.detail ||
+            msg;
+        } catch {
+          msg = (await res.text()) || msg;
+        }
         throw new Error(msg);
       }
 
-      const created = await res.json();
-      // optional: console.log("Class created:", created);
-
-      // close & reset
-      setShowDialog(false);
-      setForm({ ownerEmail: "", name: "", description: "", code: "" });
-
-      // 🔔 trigger refetch in parent
-      if (typeof onCreated === "function") {
-        await onCreated();   // if it's a thunk dispatch, awaiting is fine
-      }
+      await res.json(); // consume
+      setOpen(false);
+      setForm({
+        ownerEmail: localStorage.getItem("email") || "",
+        name: "",
+        description: "",
+        code: "",
+      });
+      if (typeof onCreated === "function") await onCreated();
     } catch (err) {
       setError(err.message || "Failed to add class");
     } finally {
@@ -56,77 +82,86 @@ export default function AddClassButton({ onCreated }) {           // <-- accept 
 
   return (
     <>
-      <button onClick={() => setShowDialog(true)} className="btn btn-primary">
-        Add Class
+      <button className="btn btn-primary" onClick={() => setOpen(true)}>
+        <i className="bi bi-plus-lg me-1" /> Add Class
       </button>
 
-      {showDialog && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white p-6 rounded-lg shadow-md w-96">
-            <h2 className="text-xl font-bold mb-4">Create New Class</h2>
+      <Modal open={open} onClose={() => !loading && setOpen(false)} width={720}>
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Create New Class</h5>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => !loading && setOpen(false)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={onSubmit}>
+          <div className="card-body">
+            {error && <div className="alert alert-danger py-2">{error}</div>}
+
+            <div className="mb-3">
+              <label className="fw-bold form-label">Owner Email</label>
               <input
                 type="email"
                 name="ownerEmail"
-                placeholder="Owner Email"
+                className="form-control"
                 value={form.ownerEmail}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
+                onChange={onChange}
                 required
               />
+            </div>
 
+            <div className="mb-3">
+              <label className="fw-bold form-label">Class Name</label>
               <input
                 type="text"
                 name="name"
-                placeholder="Class Name"
+                className="form-control"
                 value={form.name}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
+                onChange={onChange}
+                placeholder="e.g., Data Structures — Fall"
                 required
               />
+            </div>
 
+            <div className="mb-3">
+              <label className="fw-bold form-label">Class Code</label>
               <input
                 type="text"
                 name="code"
-                placeholder="Class Code"
+                className="form-control"
                 value={form.code}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
+                onChange={onChange}
                 required
               />
+            </div>
 
+            <div className="mb-3">
+              <label className="fw-bold form-label">Description</label>
               <textarea
                 name="description"
-                placeholder="Description"
+                className="form-control"
+                rows={3}
                 value={form.description}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
+                onChange={onChange}
               />
-
-              {error && <p className="text-red-600 text-sm">{error}</p>}
-
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDialog(false)}
-                  className="px-3 py-1 rounded bg-gray-200"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded bg-blue-600 text-white"
-                  disabled={loading}
-                >
-                  {loading ? "Saving..." : "Create"}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="card-footer d-flex justify-content-end gap-2">
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setOpen(false)} disabled={loading}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }

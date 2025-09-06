@@ -18,8 +18,9 @@ public class SubmissionDto {
     private String status;
     private BigDecimal gradePoints;
     private Instant submittedAt;
-    private String fileUrl;
-    private String fileName;
+    private String fileUrl;          // ✅ correct field
+    private String fileName;         // ✅ correct field
+    private String studentEmail;     // ✅ NEW: submitted-by email
 
     public static SubmissionDto from(Submission s) {
         var assignment = s.getAssignment();
@@ -32,6 +33,8 @@ public class SubmissionDto {
             cCode  = assignment.getClazz().getCode();  // ClassRoom.code
         }
 
+        String email = (s.getStudent() != null) ? s.getStudent().getEmail() : null;
+
         return new SubmissionDto(
                 s.getId(),
                 cTitle,
@@ -40,8 +43,9 @@ public class SubmissionDto {
                 s.getStatus() != null ? s.getStatus().name() : null,
                 s.getGradePoints(),
                 s.getSubmittedAt(),
-                s.getFileName(),
-                s.getFileUrl()
+                s.getFileUrl(),   // ✅ was swapped before
+                s.getFileName(),  // ✅ was swapped before
+                email             // ✅ submitted-by email
         );
     }
 }

@@ -1,3 +1,4 @@
+// src/main/java/com/example/learnspace/dto/AssignmentDto.java
 package com.example.learnspace.dto;
 
 import com.example.learnspace.model.entity.Assignment;
@@ -15,6 +16,7 @@ public class AssignmentDto {
     private String description;
     private Instant dueAt;
     private BigDecimal maxPoints;
+    private String attachmentUrl; // NEW
 
     public static AssignmentDto from(Assignment a) {
         return new AssignmentDto(
@@ -22,7 +24,8 @@ public class AssignmentDto {
                 a.getTitle(),
                 a.getDescription(),
                 a.getDueAt(),
-                a.getMaxPoints()
+                a.getMaxPoints(),
+                a.getAttachmentUrl() // NEW
         );
     }
 }
